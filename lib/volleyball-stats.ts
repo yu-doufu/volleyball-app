@@ -23,7 +23,8 @@ export type MatchState = Readonly<{
 
 export type MatchAction =
   | Readonly<{ type: 'record'; input: PlayInput }>
-  | Readonly<{ type: 'undo' }>;
+  | Readonly<{ type: 'undo' }>
+  | Readonly<{ type: 'restore'; history: readonly PlayInput[] }>;
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   serve: 'サーブ',
@@ -60,6 +61,20 @@ export const createInitialState = (): MatchState => ({
   history: [],
 });
 
+export function isPlayInput(value: unknown): value is PlayInput {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as { category?: unknown; outcome?: unknown };
+  if (typeof candidate.category !== 'string' || typeof candidate.outcome !== 'string') {
+    return false;
+  }
+
+  const outcomes = CATEGORY_OUTCOMES[candidate.category as Category];
+  return Boolean(outcomes?.includes(candidate.outcome as Outcome));
+}
+
 const updateCount = (
   counts: MatchCounts,
   input: PlayInput,
@@ -78,6 +93,10 @@ const updateCount = (
 };
 
 export function matchReducer(state: MatchState, action: MatchAction): MatchState {
+  if (action.type === 'restore') {
+    return createStateFromHistory(action.history);
+  }
+
   if (action.type === 'record') {
     return {
       counts: updateCount(state.counts, action.input, 1),
@@ -94,6 +113,13 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
     counts: updateCount(state.counts, lastInput, -1),
     history: state.history.slice(0, -1),
   };
+}
+
+export function createStateFromHistory(history: readonly PlayInput[]): MatchState {
+  return history.reduce(
+    (state, input) => matchReducer(state, { type: 'record', input }),
+    createInitialState(),
+  );
 }
 
 export function calculateRate(numerator: number, denominator: number): number {

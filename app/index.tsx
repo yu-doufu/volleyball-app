@@ -1,4 +1,3 @@
-import { useReducer } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -8,13 +7,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { usePersistentMatch } from '@/hooks/use-persistent-match';
+
 import {
   CATEGORY_LABELS,
   CATEGORY_OUTCOMES,
-  createInitialState,
   describeInput,
   formatRate,
-  matchReducer,
   OUTCOME_LABELS,
 } from '@/lib/volleyball-stats';
 import type { Category, Outcome } from '@/lib/volleyball-stats';
@@ -52,14 +51,42 @@ const rateText = (category: Category, counts: Record<string, number>): string =>
 };
 
 export default function InputScreen() {
-  const [state, dispatch] = useReducer(matchReducer, undefined, createInitialState);
+  const { state, status, canInput, apply, retry } = usePersistentMatch();
   const lastInput = state.history[state.history.length - 1];
+  const hasError = status.phase === 'load-error' || status.phase === 'save-error';
+  const statusText =
+    status.phase === 'loading'
+      ? '記録を読み込み中…'
+      : status.phase === 'saving'
+        ? '保存中…'
+        : status.phase === 'saved'
+          ? '端末内に保存済み'
+          : status.phase === 'load-error'
+            ? `復元失敗：${status.message}`
+            : `未保存：${status.message}`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={styles.title}>試合記録・通常モード</Text>
-        <Text style={styles.notice}>操作確認用・入力は保存されません</Text>
+        <View style={styles.statusRow}>
+          <Text
+            accessibilityLiveRegion="polite"
+            numberOfLines={2}
+            style={[styles.statusText, hasError && styles.statusError]}
+          >
+            {statusText}
+          </Text>
+          {hasError && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void retry()}
+              style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.retryButtonText}>再試行</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -81,13 +108,13 @@ export default function InputScreen() {
                     accessibilityHint={`${CATEGORY_LABELS[category]}の${OUTCOME_LABELS[outcome]}を1件追加します`}
                     accessibilityLabel={`${CATEGORY_LABELS[category]} ${OUTCOME_LABELS[outcome]}`}
                     accessibilityRole="button"
+                    disabled={!canInput}
                     key={outcome}
-                    onPress={() =>
-                      dispatch({ type: 'record', input: { category, outcome } })
-                    }
+                    onPress={() => apply({ type: 'record', input: { category, outcome } })}
                     style={({ pressed }) => [
                       styles.inputButton,
                       { backgroundColor: OUTCOME_COLORS[outcome] },
+                      !canInput && styles.inputButtonDisabled,
                       pressed && styles.pressed,
                     ]}
                   >
@@ -107,12 +134,12 @@ export default function InputScreen() {
         <Pressable
           accessibilityHint="直前の入力1件を取り消します"
           accessibilityRole="button"
-          disabled={!lastInput}
-          onPress={() => dispatch({ type: 'undo' })}
+          disabled={!lastInput || !canInput}
+          onPress={() => apply({ type: 'undo' })}
           style={({ pressed }) => [
             styles.undoButton,
-            !lastInput && styles.undoButtonDisabled,
-            pressed && lastInput && styles.pressed,
+            (!lastInput || !canInput) && styles.undoButtonDisabled,
+            pressed && lastInput && canInput && styles.pressed,
           ]}
         >
           <Text style={styles.undoButtonText}>1つ戻す</Text>
@@ -137,11 +164,35 @@ const styles = StyleSheet.create({
     fontSize: 23,
     fontWeight: '800',
   },
-  notice: {
-    color: '#a33a20',
+  statusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    minHeight: 38,
+  },
+  statusText: {
+    color: '#356447',
+    flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    marginTop: 2,
+    lineHeight: 18,
+  },
+  statusError: {
+    color: '#a33a20',
+  },
+  retryButton: {
+    alignItems: 'center',
+    backgroundColor: '#7d2f1d',
+    borderRadius: 7,
+    justifyContent: 'center',
+    minHeight: 34,
+    minWidth: 68,
+    paddingHorizontal: 10,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
   },
   scrollContent: {
     gap: 8,
@@ -193,6 +244,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  inputButtonDisabled: {
+    opacity: 0.45,
   },
   pressed: {
     opacity: 0.7,
