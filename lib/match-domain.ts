@@ -35,14 +35,14 @@ export type VolleyballMatch = Readonly<{
 }>;
 
 export type MatchDatabase = Readonly<{
-  version: 2;
+  version: 4;
   defaultHomeTeam: string;
   activeMatchId: string | null;
   matches: readonly VolleyballMatch[];
 }>;
 
 export const createEmptyDatabase = (): MatchDatabase => ({
-  version: 2,
+  version: 4,
   defaultHomeTeam: '自チーム',
   activeMatchId: null,
   matches: [],
@@ -140,6 +140,7 @@ function updateCurrentSet(
 }
 
 export function recordStat(database: MatchDatabase, input: PlayInput): MatchDatabase {
+  if (!isPlayInput(input)) throw new Error('不正なスタッツ入力です。');
   return updateCurrentSet(database, (set) => ({
     ...set,
     operations: [...set.operations, { type: 'stat', input }],
@@ -283,7 +284,7 @@ export function createMigratedDatabase(
 ): MatchDatabase {
   const id = 'migrated-v1-active-match';
   return {
-    version: 2,
+    version: 4,
     defaultHomeTeam: '自チーム',
     activeMatchId: id,
     matches: [

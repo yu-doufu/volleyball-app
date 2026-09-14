@@ -1,23 +1,40 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   CATEGORY_LABELS,
   CATEGORY_OUTCOMES,
   formatRate,
+  receptionRates,
   OUTCOME_LABELS,
 } from '@/lib/volleyball-stats';
 import type { Category, MatchCounts, Outcome, PlayInput } from '@/lib/volleyball-stats';
+import { InputHighlight } from '@/lib/input-highlight';
 
 const CATEGORIES: readonly Category[] = ['spike', 'dig', 'reception', 'serve', 'block'];
+const INPUT_CATEGORIES: readonly Category[] = ['spike', 'dig', 'block', 'reception', 'serve'];
 const COLORS: Record<Outcome, string> = {
   success: '#16794a',
   ace: '#1565a8',
   regular: '#6d4c1f',
   miss: '#b33a3a',
   failure: '#b33a3a',
+  jumped: '#6d4c1f',
+  touch: '#1565a8',
+  blockPoint: '#16794a',
+  receptionA: '#16794a',
+  receptionB: '#1565a8',
+  receptionMiss: '#b33a3a',
 };
 
 const rates = (category: Category, counts: Record<string, number>) => {
+  if (category === 'reception') return receptionRates(counts as MatchCounts['reception']);
+  if (category === 'block') {
+    return [
+      { label: '成功率', value: formatRate(counts.blockPoint, counts.total) },
+      { label: 'ワンタッチ率', value: formatRate(counts.touch, counts.total) },
+    ];
+  }
   if (category === 'serve') {
     return [
       { label: '決定率', value: formatRate(counts.ace, counts.total) },
@@ -34,17 +51,34 @@ export function StatsPanel({
   counts,
   disabled = false,
   onRecord,
+  highlightResetKey = '',
 }: {
   counts: MatchCounts;
   disabled?: boolean;
-  onRecord?: (input: PlayInput) => void;
+  onRecord?: (input: PlayInput) => boolean;
+  highlightResetKey?: string;
 }) {
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const feedback = useRef<InputHighlight | null>(null);
+  useLayoutEffect(() => {
+    const controller = new InputHighlight(setHighlight);
+    feedback.current = controller;
+    setHighlight(null);
+    return () => {
+      controller.dispose();
+      feedback.current = null;
+    };
+  }, [highlightResetKey]);
+  const record = (input: PlayInput) => {
+    if (disabled || !onRecord) return;
+    feedback.current?.record(input, onRecord);
+  };
   return (
     <View style={styles.list}>
-      {CATEGORIES.map((category) => {
+      {(onRecord ? INPUT_CATEGORIES : CATEGORIES).map((category) => {
         const item = counts[category];
         const countItems = [
-          { label: '合計', value: item.total },
+          { label: category === 'block' ? '総ジャンプ数' : category === 'reception' ? '本数' : '合計', value: item.total },
           ...CATEGORY_OUTCOMES[category].map((outcome) => ({
             label: OUTCOME_LABELS[outcome],
             value: item[outcome],
@@ -68,7 +102,7 @@ export function StatsPanel({
         ));
         return (
           <View key={category} style={styles.card}>
-            {onRecord ? (
+            {onRecord && category !== 'block' && category !== 'reception' ? (
               <View style={styles.compactHeader}>
                 <View style={styles.compactLeft}>
                   <Text style={styles.title}>{CATEGORY_LABELS[category]}</Text>
@@ -85,6 +119,30 @@ export function StatsPanel({
                 </View>
               </>
             )}
+            {category === 'block' && (
+              <>
+                {onRecord && <Text style={styles.compactCount}>飛んだ＝未接触／ワンタッチ＝接触・得点なし／成功＝得点</Text>}
+                {item.legacyTotal > 0 && (
+                  <View style={styles.legacy}>
+                    <Text style={styles.compactCount}>上の総ジャンプ数・内訳・率は新方式のみ</Text>
+                    <Text style={styles.count}>旧記録：本数 {item.legacyTotal}／成功 {item.success}／失敗 {item.failure}</Text>
+                    <Text style={styles.rate}>旧成功率 {formatRate(item.success, item.legacyTotal)}</Text>
+                  </View>
+                )}
+              </>
+            )}
+            {category === 'reception' && (
+              <>
+                {onRecord && <Text style={styles.compactCount}>A：セッターがほぼ動かずトス可。B：移動してトス可・他の選手がトス。ミスは従来基準。判定は記録者に委ねます。</Text>}
+                {item.legacyTotal > 0 && (
+                  <View style={styles.legacy}>
+                    <Text style={styles.compactCount}>上の本数・内訳・率は新方式のみ</Text>
+                    <Text style={styles.count}>旧記録：本数 {item.legacyTotal}／成功 {item.success}／ミス {item.miss}</Text>
+                    <Text style={styles.rate}>旧成功率 {formatRate(item.success, item.legacyTotal)}</Text>
+                  </View>
+                )}
+              </>
+            )}
             {onRecord && (
               <View style={styles.compactButtonRow}>
                 {CATEGORY_OUTCOMES[category].map((outcome) => (
@@ -93,7 +151,7 @@ export function StatsPanel({
                     accessibilityRole="button"
                     disabled={disabled}
                     key={outcome}
-                    onPress={() => onRecord({ category, outcome })}
+                    onPress={() => record({ category, outcome })}
                     style={({ pressed }) => [
                       styles.button,
                       { backgroundColor: COLORS[outcome] },
@@ -102,6 +160,9 @@ export function StatsPanel({
                     ]}
                   >
                     <Text style={styles.buttonText}>{OUTCOME_LABELS[outcome]}</Text>
+                    {highlight === `${category}:${outcome}` && !disabled && (
+                      <View pointerEvents="none" style={styles.highlighted}/>
+                    )}
                   </Pressable>
                 ))}
               </View>
@@ -135,4 +196,6 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
+  highlighted: { position: 'absolute', top: 3, bottom: 3, left: 3, right: 3, borderColor: '#fff', borderWidth: 2, borderRadius: 7 },
+  legacy: { borderTopWidth: 1, borderTopColor: '#d9e0e3', marginTop: 5, paddingTop: 5 },
 });

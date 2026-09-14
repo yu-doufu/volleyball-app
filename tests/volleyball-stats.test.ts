@@ -12,11 +12,11 @@ import type { Category, PlayInput } from '../lib/volleyball-stats.ts';
 
 const categories = Object.keys(CATEGORY_OUTCOMES) as Category[];
 
-test('全12ボタンが合計と対応する内訳を1ずつ増やす', () => {
+test('全14ボタンが合計と対応する内訳を1ずつ増やす', () => {
   const inputs: PlayInput[] = categories.flatMap((category) =>
     CATEGORY_OUTCOMES[category].map((outcome) => ({ category, outcome })),
   );
-  assert.equal(inputs.length, 12);
+  assert.equal(inputs.length, 14);
 
   for (const input of inputs) {
     const initial = createInitialState();

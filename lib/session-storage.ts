@@ -1,4 +1,4 @@
-import { isPlayInput } from './volleyball-stats.ts';
+import { isLegacyPlayInput } from './volleyball-stats.ts';
 import type { PlayInput } from './volleyball-stats.ts';
 
 export const SESSION_STORAGE_KEY = 'volleyball-app.active-session.v1';
@@ -35,6 +35,9 @@ export function serializeSession(
   history: readonly PlayInput[],
   now: () => Date = () => new Date(),
 ): string {
+  if (!history.every(isLegacyPlayInput)) {
+    throw new SessionStorageError('invalid-data', '新方式の記録はversion 1へ保存できません。');
+  }
   const data: StoredSessionV1 = {
     version: SESSION_FORMAT_VERSION,
     activeSession: {
@@ -75,7 +78,7 @@ export function parseSession(raw: string): StoredSessionV1 {
     typeof session !== 'object' ||
     session === null ||
     !Array.isArray(session.history) ||
-    !session.history.every(isPlayInput) ||
+    !session.history.every(isLegacyPlayInput) ||
     typeof session.updatedAt !== 'string' ||
     Number.isNaN(Date.parse(session.updatedAt))
   ) {

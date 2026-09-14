@@ -5,7 +5,13 @@ export type Outcome =
   | 'ace'
   | 'miss'
   | 'failure'
-  | 'regular';
+  | 'regular'
+  | 'jumped'
+  | 'touch'
+  | 'blockPoint'
+  | 'receptionA'
+  | 'receptionB'
+  | 'receptionMiss';
 
 export type PlayInput = Readonly<{
   category: Category;
@@ -40,12 +46,18 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   miss: 'ミス',
   failure: '失敗',
   regular: '通常',
+  jumped: '飛んだ',
+  touch: 'ワンタッチ',
+  blockPoint: '成功',
+  receptionA: 'A',
+  receptionB: 'B',
+  receptionMiss: 'ミス',
 };
 
 export const CATEGORY_OUTCOMES: Record<Category, readonly Outcome[]> = {
   serve: ['success', 'ace', 'miss'],
-  reception: ['success', 'miss'],
-  block: ['success', 'failure'],
+  reception: ['receptionA', 'receptionB', 'receptionMiss'],
+  block: ['jumped', 'touch', 'blockPoint'],
   dig: ['success', 'miss'],
   spike: ['success', 'regular', 'miss'],
 };
@@ -53,8 +65,8 @@ export const CATEGORY_OUTCOMES: Record<Category, readonly Outcome[]> = {
 export const createInitialState = (): MatchState => ({
   counts: {
     serve: { total: 0, success: 0, ace: 0, miss: 0 },
-    reception: { total: 0, success: 0, miss: 0 },
-    block: { total: 0, success: 0, failure: 0 },
+    reception: { total: 0, receptionA: 0, receptionB: 0, receptionMiss: 0, legacyTotal: 0, success: 0, miss: 0 },
+    block: { total: 0, jumped: 0, touch: 0, blockPoint: 0, legacyTotal: 0, success: 0, failure: 0 },
     dig: { total: 0, success: 0, miss: 0 },
     spike: { total: 0, success: 0, regular: 0, miss: 0 },
   },
@@ -71,8 +83,36 @@ export function isPlayInput(value: unknown): value is PlayInput {
     return false;
   }
 
+  if (!Object.prototype.hasOwnProperty.call(CATEGORY_OUTCOMES, candidate.category)) return false;
+  if (candidate.category === 'block' && ['success', 'failure'].includes(candidate.outcome)) return true;
+  if (candidate.category === 'reception' && ['success', 'miss'].includes(candidate.outcome)) return true;
   const outcomes = CATEGORY_OUTCOMES[candidate.category as Category];
   return Boolean(outcomes?.includes(candidate.outcome as Outcome));
+}
+
+// Legacy success/failure remain distinct from all three new outcomes.
+export function isLegacyPlayInput(value: unknown): value is PlayInput {
+  return isPlayInputV3(value) && (value.category !== 'block' ||
+    value.outcome === 'success' || value.outcome === 'failure');
+}
+
+// Version 3 includes new block results, but only legacy reception results.
+export function isPlayInputV3(value: unknown): value is PlayInput {
+  return isPlayInput(value) && (value.category !== 'reception' ||
+    value.outcome === 'success' || value.outcome === 'miss');
+}
+
+export function isLegacyResult(input: PlayInput): boolean {
+  return (input.category === 'block' && isLegacyPlayInput(input)) ||
+    (input.category === 'reception' && isPlayInputV3(input));
+}
+
+export function receptionRates(counts: CategoryCounts) {
+  return [
+    { label: 'A率', value: formatRate(counts.receptionA, counts.total) },
+    { label: 'B率', value: formatRate(counts.receptionB, counts.total) },
+    { label: '成功率', value: formatRate(counts.receptionA + counts.receptionB, counts.total) },
+  ];
 }
 
 const updateCount = (
@@ -81,12 +121,13 @@ const updateCount = (
   amount: 1 | -1,
 ): MatchCounts => {
   const current = counts[input.category];
+  const totalKey = isLegacyResult(input) ? 'legacyTotal' : 'total';
 
   return {
     ...counts,
     [input.category]: {
       ...current,
-      total: current.total + amount,
+      [totalKey]: current[totalKey] + amount,
       [input.outcome]: current[input.outcome] + amount,
     },
   };
@@ -98,6 +139,7 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
   }
 
   if (action.type === 'record') {
+    if (!isPlayInput(action.input)) throw new Error('不正なスタッツ入力です。');
     return {
       counts: updateCount(state.counts, action.input, 1),
       history: [...state.history, action.input],
@@ -135,5 +177,6 @@ export function describeInput(input: PlayInput | undefined): string {
     return 'まだ入力はありません';
   }
 
-  return `${CATEGORY_LABELS[input.category]}・${OUTCOME_LABELS[input.outcome]}`;
+  const legacy = isLegacyResult(input) ? '（旧記録）' : '';
+  return `${CATEGORY_LABELS[input.category]}${legacy}・${OUTCOME_LABELS[input.outcome]}`;
 }

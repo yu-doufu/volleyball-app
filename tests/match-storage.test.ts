@@ -8,17 +8,17 @@ import type { KeyValueStorage } from '../lib/session-storage.ts';
 
 class Storage implements KeyValueStorage {
   values = new Map<string, string>();
-  failV2Writes = 0;
+  failCurrentWrites = 0;
   async getItem(key: string) {
     return this.values.get(key) ?? null;
   }
   async setItem(key: string, value: string) {
-    if (key === MATCH_DATABASE_KEY && this.failV2Writes-- > 0) throw new Error('write failed');
+    if (key === MATCH_DATABASE_KEY && this.failCurrentWrites-- > 0) throw new Error('write failed');
     this.values.set(key, value);
   }
 }
 
-test('version 2を保存し途中再起動相当で復元する', async () => {
+test('version 4を保存し途中再起動相当で復元する', async () => {
   const storage = new Storage();
   const repository = new MatchRepository(storage);
   const database = { ...createEmptyDatabase(), defaultHomeTeam: '引継チーム' };
@@ -49,7 +49,7 @@ test('移行保存失敗時は旧データを維持し、再起動で安全に�
   const storage = new Storage();
   const legacy = serializeSession([], () => new Date('2026-08-31T00:00:00Z'));
   storage.values.set(SESSION_STORAGE_KEY, legacy);
-  storage.failV2Writes = 1;
+  storage.failCurrentWrites = 1;
   await assert.rejects(new MatchRepository(storage).load(), SessionStorageError);
   assert.equal(storage.values.get(SESSION_STORAGE_KEY), legacy);
   assert.equal(storage.values.has(MATCH_DATABASE_KEY), false);
@@ -58,7 +58,7 @@ test('移行保存失敗時は旧データを維持し、再起動で安全に�
   assert.equal(retry.database?.matches.length, 1);
 });
 
-test('壊れたversion 2を旧データで上書きしない', async () => {
+test('壊れたversion 4を旧データで上書きしない', async () => {
   const storage = new Storage();
   storage.values.set(MATCH_DATABASE_KEY, '{broken');
   storage.values.set(SESSION_STORAGE_KEY, serializeSession([]));
@@ -66,7 +66,7 @@ test('壊れたversion 2を旧データで上書きしない', async () => {
   assert.equal(storage.values.get(MATCH_DATABASE_KEY), '{broken');
 });
 
-test('version 2の連続書込を直列化して最後の状態を残す', async () => {
+test('version 4の連続書込を直列化して最後の状態を残す', async () => {
   let release: (() => void) | undefined;
   const writes: string[] = [];
   const storage: KeyValueStorage = {
@@ -88,10 +88,10 @@ test('version 2の連続書込を直列化して最後の状態を残す', async
   assert.equal(JSON.parse(writes[1]).defaultHomeTeam, '最新チーム');
 });
 
-test('version 2保存失敗で渡した記録を変更せず再試行できる', async () => {
+test('version 4保存失敗で渡した記録を変更せず再試行できる', async () => {
   const storage = new Storage();
   const database = { ...createEmptyDatabase(), defaultHomeTeam: 'メモリ上の記録' };
-  storage.failV2Writes = 1;
+  storage.failCurrentWrites = 1;
   const repository = new MatchRepository(storage);
   await assert.rejects(repository.save(database), SessionStorageError);
   assert.equal(database.defaultHomeTeam, 'メモリ上の記録');
