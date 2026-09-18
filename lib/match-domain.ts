@@ -167,6 +167,27 @@ export function undoCurrentSet(database: MatchDatabase): MatchDatabase {
   );
 }
 
+/** Restores only the in-progress set to its empty, before-recording state. */
+export function clearCurrentSet(database: MatchDatabase): MatchDatabase {
+  return updateCurrentSet(database, (set) => ({
+    ...set,
+    operations: [],
+    finalHomeScore: null,
+    finalAwayScore: null,
+  }));
+}
+
+/** Removes the in-progress match while retaining completed match history and defaults. */
+export function clearActiveMatch(database: MatchDatabase): MatchDatabase {
+  const active = getActiveMatch(database);
+  if (!active) return database;
+  return {
+    ...database,
+    activeMatchId: null,
+    matches: database.matches.filter((match) => match.id !== active.id),
+  };
+}
+
 export function deriveSet(set: VolleyballSet) {
   const statHistory = set.operations
     .filter((operation): operation is Extract<SetOperation, { type: 'stat' }> =>

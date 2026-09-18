@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   aggregateMatchStats,
+  clearActiveMatch,
+  clearCurrentSet,
   completeCurrentSet,
   completeMatch,
   createEmptyDatabase,
@@ -51,6 +53,14 @@ test('点数操作とスタッツを操作順にUndoする', () => {
   assert.equal(deriveSet(getCurrentSet(getActiveMatch(database)!)!).homeScore, null);
   database = undoCurrentSet(database);
   assert.equal(deriveSet(getCurrentSet(getActiveMatch(database)!)!).stats.counts.serve.total, 0);
+});
+
+test('1点減らす操作は0を記録し、Undoで直前の点数へ戻す', () => {
+  let database = setScore(started(), 'home', 1);
+  database = setScore(database, 'home', 0);
+  assert.equal(deriveSet(getCurrentSet(getActiveMatch(database)!)!).homeScore, 0);
+  database = undoCurrentSet(database);
+  assert.equal(deriveSet(getCurrentSet(getActiveMatch(database)!)!).homeScore, 1);
 });
 
 test('次セットは0から始まり、Undoが終了セットをまたがない', () => {
@@ -106,4 +116,39 @@ test('試合ごと・セットごとにイベントが混ざらない', () => {
   );
   assert.equal(deriveSet(database.matches[0].sets[0]).stats.counts.block.success, 1);
   assert.equal(deriveSet(database.matches[1].sets[0]).stats.counts.block.success, 0);
+});
+
+test('現在セットのクリアはそのセットの点数・スタッツ・Undo履歴だけを空にする', () => {
+  let database = recordStat(started(), { category: 'serve', outcome: 'ace' });
+  database = setScore(database, 'home', 25);
+  database = completeCurrentSet(database, { home: 25, away: 20 });
+  database = startNextSet(database);
+  database = recordStat(database, { category: 'dig', outcome: 'success' });
+  database = setScore(database, 'home', 4);
+  database = setScore(database, 'away', 2);
+  const originalHomeTeam = getActiveMatch(database)!.homeTeam;
+  database = clearCurrentSet(database);
+  const match = getActiveMatch(database)!;
+  const current = getCurrentSet(match)!;
+  const derived = deriveSet(current);
+  assert.equal(current.operations.length, 0);
+  assert.equal(derived.homeScore, null);
+  assert.equal(derived.awayScore, null);
+  assert.equal(derived.lastOperation, undefined);
+  assert.equal(derived.stats.counts.dig.total, 0);
+  assert.equal(match.sets[0].finalHomeScore, 25);
+  assert.equal(match.sets[0].operations.length, 2);
+  assert.equal(match.homeTeam, originalHomeTeam);
+});
+
+test('記録中の試合のクリアはその試合だけを削除し、完了済み試合と既定チーム名を保持する', () => {
+  let database = completeCurrentSet(started(), { home: 25, away: 20 });
+  database = completeMatch(database, '2026-08-31T01:00:00.000Z');
+  database = startMatch(database, { date: '2026-09-01', homeTeam: '別の自チーム', awayTeam: '相手' }, { id: 'match-2', now: '2026-09-01T00:00:00.000Z' });
+  const cleared = clearActiveMatch(database);
+  assert.equal(cleared.activeMatchId, null);
+  assert.equal(cleared.matches.length, 1);
+  assert.equal(cleared.matches[0].id, 'match-1');
+  assert.equal(cleared.matches[0].status, 'completed');
+  assert.equal(cleared.defaultHomeTeam, '別の自チーム');
 });

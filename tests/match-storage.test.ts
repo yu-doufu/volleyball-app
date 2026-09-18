@@ -1,7 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createEmptyDatabase, deriveSet, getActiveMatch } from '../lib/match-domain.ts';
+import {
+  clearActiveMatch,
+  clearCurrentSet,
+  createEmptyDatabase,
+  deriveSet,
+  getActiveMatch,
+  recordStat,
+  setScore,
+  startMatch,
+} from '../lib/match-domain.ts';
 import { MATCH_DATABASE_KEY, MatchRepository } from '../lib/match-storage.ts';
 import { serializeSession, SESSION_STORAGE_KEY, SessionStorageError } from '../lib/session-storage.ts';
 import type { KeyValueStorage } from '../lib/session-storage.ts';
@@ -98,4 +107,23 @@ test('version 4保存失敗で渡した記録を変更せず再試行できる',
   assert.equal(storage.values.has(MATCH_DATABASE_KEY), false);
   await repository.save(database);
   assert.deepEqual((await repository.load()).database, database);
+});
+
+test('セット・試合のクリア後の状態は保存と再読み込み後も維持される', async () => {
+  const storage = new Storage();
+  const repository = new MatchRepository(storage);
+  let database = startMatch(createEmptyDatabase(), { date: '2026-09-18', homeTeam: '自チーム', awayTeam: '相手' }, { id: 'active', now: '2026-09-18T00:00:00.000Z' });
+  database = recordStat(database, { category: 'serve', outcome: 'ace' });
+  database = setScore(database, 'home', 3);
+  database = clearCurrentSet(database);
+  await repository.save(database);
+  let loaded = (await new MatchRepository(storage).load()).database!;
+  assert.equal(getActiveMatch(loaded)!.sets[0].operations.length, 0);
+  assert.equal(deriveSet(getActiveMatch(loaded)!.sets[0]).homeScore, null);
+  loaded = clearActiveMatch(loaded);
+  await repository.save(loaded);
+  loaded = (await new MatchRepository(storage).load()).database!;
+  assert.equal(loaded.activeMatchId, null);
+  assert.equal(loaded.matches.length, 0);
+  assert.equal(loaded.defaultHomeTeam, '自チーム');
 });

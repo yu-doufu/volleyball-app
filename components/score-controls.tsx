@@ -48,11 +48,23 @@ export function ScoreControls({
     score: number | null,
     draft: string,
     setDraft: (value: string) => void,
-  ) => (
-    <View style={styles.side}>
-      <Text numberOfLines={2} style={styles.name}>{name}</Text>
-      <View style={styles.controls}>
-        <TextInput
+  ) => {
+    const decrement = (
+      <Pressable
+          accessibilityLabel={`${name}から1点減らす`}
+          disabled={disabled || score === null || score === 0}
+          onPress={() => {
+            const draftScore = parse(draft);
+            const currentScore = typeof draftScore === 'number' ? draftScore : score;
+            if (currentScore !== null && currentScore > 0) onChange(teamSide, currentScore - 1);
+          }}
+          style={({ pressed }) => [styles.adjustMinus, (disabled || score === null || score === 0) && styles.disabled, pressed && styles.pressed]}
+        >
+          <Text style={styles.adjustMinusText}>−1</Text>
+      </Pressable>
+    );
+    const input = (
+      <TextInput
           accessibilityLabel={`${name}の点数`}
           editable={!disabled}
           inputMode="numeric"
@@ -62,22 +74,33 @@ export function ScoreControls({
           selectTextOnFocus
           style={[styles.input, error === teamSide && styles.inputError]}
           value={draft}
-        />
-        <Pressable
+      />
+    );
+    const increment = (
+      <Pressable
           accessibilityLabel={`${name}に1点追加`}
           disabled={disabled}
           onPress={() => {
             const draftScore = parse(draft);
             onChange(teamSide, (typeof draftScore === 'number' ? draftScore : score ?? 0) + 1);
           }}
-          style={({ pressed }) => [styles.plus, disabled && styles.disabled, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.adjustPlus, disabled && styles.disabled, pressed && styles.pressed]}
         >
-          <Text style={styles.plusText}>＋1</Text>
-        </Pressable>
+          <Text style={styles.adjustPlusText}>＋1</Text>
+      </Pressable>
+    );
+    return (
+      <View style={styles.side}>
+        <Text numberOfLines={2} style={styles.name}>{name}</Text>
+        <View style={styles.controls}>
+          {teamSide === 'home'
+            ? <>{decrement}{input}{increment}</>
+            : <>{increment}{input}{decrement}</>}
+        </View>
+        <Text style={styles.hint}>{error === teamSide ? '0以上の整数を入力' : '空欄は未確定'}</Text>
       </View>
-      <Text style={styles.hint}>{error === teamSide ? '0以上の整数を入力' : '空欄は未確定'}</Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -93,10 +116,12 @@ const styles = StyleSheet.create({
   side: { flex: 1, minWidth: 0 },
   name: { color: '#172126', fontSize: 15, fontWeight: '800', minHeight: 38, textAlign: 'center' },
   controls: { flexDirection: 'row', gap: 5 },
-  input: { backgroundColor: '#fff', borderColor: '#73838b', borderRadius: 8, borderWidth: 1, color: '#111', flex: 1, fontSize: 24, fontWeight: '800', minHeight: 50, minWidth: 0, paddingHorizontal: 5, textAlign: 'center' },
+  input: { backgroundColor: '#fff', borderColor: '#73838b', borderRadius: 8, borderWidth: 1, color: '#111', flex: 1, fontSize: 24, fontWeight: '800', minHeight: 50, minWidth: 36, paddingHorizontal: 5, textAlign: 'center' },
   inputError: { borderColor: '#b3261e', borderWidth: 2 },
-  plus: { alignItems: 'center', backgroundColor: '#174e78', borderRadius: 8, justifyContent: 'center', minHeight: 50, minWidth: 54, paddingHorizontal: 6 },
-  plusText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  adjustPlus: { alignItems: 'center', backgroundColor: '#174e78', borderRadius: 8, justifyContent: 'center', minHeight: 50, minWidth: 48, paddingHorizontal: 5 },
+  adjustPlusText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  adjustMinus: { alignItems: 'center', backgroundColor: '#e8eef1', borderColor: '#aab8c2', borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 50, minWidth: 42, paddingHorizontal: 4 },
+  adjustMinusText: { color: '#344249', fontSize: 17, fontWeight: '800' },
   dash: { color: '#172126', fontSize: 24, fontWeight: '800', paddingTop: 30 },
   hint: { color: '#766', fontSize: 11, minHeight: 16, textAlign: 'center' },
   disabled: { opacity: 0.45 },
