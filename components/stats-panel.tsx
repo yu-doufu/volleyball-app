@@ -42,7 +42,7 @@ const rates = (category: Category, counts: Record<string, number>) => {
     ];
   }
   return [{
-    label: category === 'spike' ? '決定率' : '成功率',
+    label: '成功率',
     value: formatRate(counts.success, counts.total),
   }];
 };

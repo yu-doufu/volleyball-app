@@ -40,6 +40,13 @@ yarn-error.*
 
 app-example
 
+# PAD / Codex local handoff files
+/.codex-result.txt
+/.codex-task.txt
+/.codex-stdout.log
+/.codex-stderr.log
+/pad-flow-test.txt
+
 # generated native folders
 /ios
 /android

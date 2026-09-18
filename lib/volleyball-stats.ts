@@ -45,7 +45,7 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   ace: 'エース',
   miss: 'ミス',
   failure: '失敗',
-  regular: '通常',
+  regular: '拾われた',
   jumped: '飛んだ',
   touch: 'ワンタッチ',
   blockPoint: '成功',
