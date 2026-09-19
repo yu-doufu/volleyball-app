@@ -41,6 +41,16 @@ export type MatchDatabase = Readonly<{
   matches: readonly VolleyballMatch[];
 }>;
 
+export type CompletedMatchSummary = Readonly<{
+  homeSetWins: number;
+  awaySetWins: number;
+  sets: readonly Readonly<{
+    number: number;
+    homeScore: number | null;
+    awayScore: number | null;
+  }>[];
+}>;
+
 export const createEmptyDatabase = (): MatchDatabase => ({
   version: 4,
   defaultHomeTeam: '自チーム',
@@ -73,8 +83,98 @@ export function getActiveMatch(database: MatchDatabase): VolleyballMatch | null 
   );
 }
 
+/** Returns completed matches for presentation without changing stored match order. */
+export function getCompletedMatchesNewestFirst(
+  matches: readonly VolleyballMatch[],
+): readonly VolleyballMatch[] {
+  return matches
+    .map((match, index) => ({
+      match,
+      index,
+      completedAt: match.completedAt === null ? Number.NaN : Date.parse(match.completedAt),
+    }))
+    .filter(({ match }) => match.status === 'completed')
+    .sort((left, right) => {
+      const leftIsComparable = Number.isFinite(left.completedAt);
+      const rightIsComparable = Number.isFinite(right.completedAt);
+      if (leftIsComparable && rightIsComparable) {
+        return right.completedAt - left.completedAt || left.index - right.index;
+      }
+      if (leftIsComparable) return -1;
+      if (rightIsComparable) return 1;
+      return left.index - right.index;
+    })
+    .map(({ match }) => match);
+}
+
+/** Derives completed-set results for history presentation without changing match data. */
+export function deriveCompletedMatchSummary(match: VolleyballMatch): CompletedMatchSummary {
+  const sets = match.sets
+    .filter((set) => set.status === 'completed')
+    .map((set, index) => ({ set, index }))
+    .sort((left, right) => left.set.number - right.set.number || left.index - right.index)
+    .map(({ set }) => ({
+      number: set.number,
+      homeScore: set.finalHomeScore,
+      awayScore: set.finalAwayScore,
+    }));
+  const results = match.sets.map(setResult);
+
+  return {
+    homeSetWins: results.filter((result) => result === 'home-win').length,
+    awaySetWins: results.filter((result) => result === 'away-win').length,
+    sets,
+  };
+}
+
 export function getCurrentSet(match: VolleyballMatch): VolleyballSet | null {
   return [...match.sets].reverse().find((set) => set.status === 'in-progress') ?? null;
+}
+
+/** True only when the active match can safely return from an untouched next set. */
+export function canRemoveCurrentEmptySet(database: MatchDatabase): boolean {
+  const match = getActiveMatch(database);
+  if (!match || match.status !== 'in-progress') return false;
+  const current = getCurrentSet(match);
+  if (!current || match.sets[match.sets.length - 1]?.id !== current.id) return false;
+  const currentIndex = match.sets.length - 1;
+  return (
+    match.sets.slice(0, currentIndex).some((set) => set.status === 'completed') &&
+    current.operations.length === 0 &&
+    current.finalHomeScore === null &&
+    current.finalAwayScore === null
+  );
+}
+
+/** True only when the active, last in-progress set was created after a completed set. */
+export function canDiscardCurrentNewSet(database: MatchDatabase): boolean {
+  const match = getActiveMatch(database);
+  if (!match || match.status !== 'in-progress') return false;
+  const current = getCurrentSet(match);
+  if (!current || match.sets[match.sets.length - 1]?.id !== current.id) return false;
+  return (
+    match.sets.slice(0, -1).some((set) => set.status === 'completed') &&
+    current.finalHomeScore === null &&
+    current.finalAwayScore === null
+  );
+}
+
+/** Removes only an untouched, active next set; all completed-set data is retained. */
+export function removeCurrentEmptySet(database: MatchDatabase): MatchDatabase {
+  if (!canRemoveCurrentEmptySet(database)) {
+    throw new Error('空の新規セットだけを前のセットへ戻せます。');
+  }
+  const match = getActiveMatch(database)!;
+  return replaceMatch(database, { ...match, sets: match.sets.slice(0, -1) });
+}
+
+/** Discards only the active, last new set after explicit user confirmation. */
+export function discardCurrentNewSet(database: MatchDatabase): MatchDatabase {
+  if (!canDiscardCurrentNewSet(database)) {
+    throw new Error('新規セットを破棄できる状態ではありません。');
+  }
+  const match = getActiveMatch(database)!;
+  return replaceMatch(database, { ...match, sets: match.sets.slice(0, -1) });
 }
 
 export function startMatch(

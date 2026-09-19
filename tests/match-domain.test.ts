@@ -3,16 +3,22 @@ import test from 'node:test';
 
 import {
   aggregateMatchStats,
+  canDiscardCurrentNewSet,
+  canRemoveCurrentEmptySet,
   clearActiveMatch,
   clearCurrentSet,
   completeCurrentSet,
   completeMatch,
   createEmptyDatabase,
+  deriveCompletedMatchSummary,
   deriveSet,
+  discardCurrentNewSet,
   editCompletedSetScore,
   getActiveMatch,
+  getCompletedMatchesNewestFirst,
   getCurrentSet,
   recordStat,
+  removeCurrentEmptySet,
   setResult,
   setScore,
   startMatch,
@@ -151,4 +157,136 @@ test('記録中の試合のクリアはその試合だけを削除し、完了�
   assert.equal(cleared.matches[0].id, 'match-1');
   assert.equal(cleared.matches[0].status, 'completed');
   assert.equal(cleared.defaultHomeTeam, '別の自チーム');
+});
+
+test('completed history is newest first without changing stored match order', () => {
+  const first = completeMatch(completeCurrentSet(started(), { home: 25, away: 20 }), '2026-08-31T01:00:00.000Z');
+  let database = startMatch(first, { date: '2026-09-01', homeTeam: 'A', awayTeam: 'B' }, { id: 'match-2', now: '2026-09-01T00:00:00.000Z' });
+  database = completeMatch(completeCurrentSet(database, { home: 25, away: 20 }), '2026-09-02T01:00:00.000Z');
+  database = startMatch(database, { date: '2026-09-03', homeTeam: 'C', awayTeam: 'D' }, { id: 'match-3', now: '2026-09-03T00:00:00.000Z' });
+  database = completeMatch(completeCurrentSet(database, { home: 25, away: 20 }), '2026-09-03T01:00:00.000Z');
+
+  const original = database.matches.map((match) => match.id);
+  const history = getCompletedMatchesNewestFirst(database.matches);
+
+  assert.deepEqual(history.map((match) => match.id), ['match-3', 'match-2', 'match-1']);
+  assert.deepEqual(database.matches.map((match) => match.id), original);
+  assert.notStrictEqual(history, database.matches);
+  assert.strictEqual(database.matches.find((match) => match.id === history[0].id), history[0]);
+});
+
+test('completed history keeps equal, missing, and invalid completion timestamps visible and stable', () => {
+  const completed = (id: string, completedAt: string | null) => ({
+    ...started().matches[0], id, status: 'completed' as const, completedAt,
+  });
+  const matches = [
+    completed('missing-first', null),
+    completed('older', '2026-08-31T01:00:00.000Z'),
+    completed('equal-first', '2026-09-02T01:00:00.000Z'),
+    completed('invalid', 'not-a-date'),
+    completed('equal-second', '2026-09-02T01:00:00.000Z'),
+    completed('missing-second', null),
+  ];
+
+  const history = getCompletedMatchesNewestFirst(matches);
+
+  assert.deepEqual(history.map((match) => match.id), [
+    'equal-first', 'equal-second', 'older', 'missing-first', 'invalid', 'missing-second',
+  ]);
+  assert.deepEqual(matches.map((match) => match.id), [
+    'missing-first', 'older', 'equal-first', 'invalid', 'equal-second', 'missing-second',
+  ]);
+});
+
+test('completed-match history summary counts only clear winners and keeps completed sets in set-number order', () => {
+  const match = {
+    ...started().matches[0],
+    status: 'completed' as const,
+    sets: [
+      { ...started().matches[0].sets[0], id: 'set-3', number: 3, status: 'completed' as const, finalHomeScore: 15, finalAwayScore: 12 },
+      { ...started().matches[0].sets[0], id: 'set-1', number: 1, status: 'completed' as const, finalHomeScore: 25, finalAwayScore: 20 },
+      { ...started().matches[0].sets[0], id: 'set-2', number: 2, status: 'completed' as const, finalHomeScore: 22, finalAwayScore: 25 },
+      { ...started().matches[0].sets[0], id: 'set-4', number: 4, status: 'completed' as const, finalHomeScore: 20, finalAwayScore: 20 },
+      { ...started().matches[0].sets[0], id: 'set-5', number: 5, status: 'completed' as const, finalHomeScore: null, finalAwayScore: 8 },
+    ],
+  };
+  const before = JSON.stringify(match);
+
+  const summary = deriveCompletedMatchSummary(match);
+
+  assert.deepEqual(summary, {
+    homeSetWins: 2,
+    awaySetWins: 1,
+    sets: [
+      { number: 1, homeScore: 25, awayScore: 20 },
+      { number: 2, homeScore: 22, awayScore: 25 },
+      { number: 3, homeScore: 15, awayScore: 12 },
+      { number: 4, homeScore: 20, awayScore: 20 },
+      { number: 5, homeScore: null, awayScore: 8 },
+    ],
+  });
+  assert.equal(JSON.stringify(match), before);
+});
+
+test('completed-match history summary permits a match without completed sets', () => {
+  const match = { ...started().matches[0], status: 'completed' as const };
+
+  assert.deepEqual(deriveCompletedMatchSummary(match), {
+    homeSetWins: 0,
+    awaySetWins: 0,
+    sets: [],
+  });
+});
+
+test('空の次セットだけを削除して前の確定済みセットを完全に保持する', () => {
+  let database = recordStat(started(), { category: 'serve', outcome: 'ace' });
+  database = setScore(database, 'home', 25);
+  database = completeCurrentSet(database, { home: 25, away: 20 });
+  database = startNextSet(database);
+  const before = getActiveMatch(database)!;
+  const completed = before.sets[0];
+
+  assert.equal(canRemoveCurrentEmptySet(database), true);
+  const returned = removeCurrentEmptySet(database);
+  const match = getActiveMatch(returned)!;
+
+  assert.deepEqual(match.sets, [completed]);
+  assert.equal(match.id, before.id);
+  assert.equal(match.homeTeam, before.homeTeam);
+  assert.equal(match.awayTeam, before.awayTeam);
+  assert.equal(match.createdAt, before.createdAt);
+  assert.equal(returned.defaultHomeTeam, database.defaultHomeTeam);
+});
+
+test('入力済みの次セットは確認用の破棄操作だけで削除でき、空セット用操作は拒否する', () => {
+  let database = completeCurrentSet(started(), { home: 25, away: 20 });
+  database = startNextSet(database);
+  database = recordStat(database, { category: 'dig', outcome: 'success' });
+  const unchanged = JSON.stringify(database);
+
+  assert.equal(canRemoveCurrentEmptySet(database), false);
+  assert.equal(canDiscardCurrentNewSet(database), true);
+  assert.throws(() => removeCurrentEmptySet(database));
+  assert.equal(JSON.stringify(database), unchanged);
+  const returned = discardCurrentNewSet(database);
+  assert.equal(getActiveMatch(returned)!.sets.length, 1);
+  assert.equal(getActiveMatch(returned)!.sets[0].status, 'completed');
+});
+
+test('新規セット破棄は最終・進行中・前の確定済みセットの条件を満たさなければ拒否する', () => {
+  assert.equal(canDiscardCurrentNewSet(started()), false);
+  assert.throws(() => discardCurrentNewSet(started()));
+
+  let completedOnly = completeCurrentSet(started(), { home: 25, away: 20 });
+  assert.equal(canDiscardCurrentNewSet(completedOnly), false);
+  assert.throws(() => discardCurrentNewSet(completedOnly));
+
+  completedOnly = startNextSet(completedOnly);
+  const active = getActiveMatch(completedOnly)!;
+  const invalid = {
+    ...completedOnly,
+    matches: [{ ...active, sets: [...active.sets, { ...active.sets[1], id: 'not-last', status: 'completed' as const, finalHomeScore: 25, finalAwayScore: 20 }] }],
+  };
+  assert.equal(canDiscardCurrentNewSet(invalid), false);
+  assert.throws(() => discardCurrentNewSet(invalid));
 });

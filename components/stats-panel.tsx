@@ -102,7 +102,7 @@ export function StatsPanel({
         ));
         return (
           <View key={category} style={styles.card}>
-            {onRecord && category !== 'block' && category !== 'reception' ? (
+            {onRecord ? (
               <View style={styles.compactHeader}>
                 <View style={styles.compactLeft}>
                   <Text style={styles.title}>{CATEGORY_LABELS[category]}</Text>
@@ -121,10 +121,8 @@ export function StatsPanel({
             )}
             {category === 'block' && (
               <>
-                {onRecord && <Text style={styles.compactCount}>飛んだ＝未接触／ワンタッチ＝接触・得点なし／成功＝得点</Text>}
                 {item.legacyTotal > 0 && (
                   <View style={styles.legacy}>
-                    <Text style={styles.compactCount}>上の総ジャンプ数・内訳・率は新方式のみ</Text>
                     <Text style={styles.count}>旧記録：本数 {item.legacyTotal}／成功 {item.success}／失敗 {item.failure}</Text>
                     <Text style={styles.rate}>旧成功率 {formatRate(item.success, item.legacyTotal)}</Text>
                   </View>
@@ -133,10 +131,8 @@ export function StatsPanel({
             )}
             {category === 'reception' && (
               <>
-                {onRecord && <Text style={styles.compactCount}>A：セッターがほぼ動かずトス可。B：移動してトス可・他の選手がトス。ミスは従来基準。判定は記録者に委ねます。</Text>}
                 {item.legacyTotal > 0 && (
                   <View style={styles.legacy}>
-                    <Text style={styles.compactCount}>上の本数・内訳・率は新方式のみ</Text>
                     <Text style={styles.count}>旧記録：本数 {item.legacyTotal}／成功 {item.success}／ミス {item.miss}</Text>
                     <Text style={styles.rate}>旧成功率 {formatRate(item.success, item.legacyTotal)}</Text>
                   </View>
@@ -176,7 +172,7 @@ export function StatsPanel({
 
 const styles = StyleSheet.create({
   list: { gap: 8 },
-  card: { backgroundColor: '#fff', borderColor: '#d9e0e3', borderRadius: 12, borderWidth: 1, padding: 10 },
+  card: { backgroundColor: '#fff', borderColor: '#d9e0e3', borderRadius: 12, borderWidth: 1, padding: 9 },
   title: { color: '#172126', fontSize: 20, fontWeight: '800' },
   compactHeader: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, rowGap: 1 },
   compactLeft: { alignItems: 'flex-end', flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 180 },
@@ -191,7 +187,7 @@ const styles = StyleSheet.create({
   rateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
   rateItem: { flexDirection: 'row', flexShrink: 0 },
   rate: { color: '#53636a', fontSize: 14, fontWeight: '600' },
-  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 3 },
+  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 5 },
   button: { alignItems: 'center', borderRadius: 10, flex: 1, justifyContent: 'center', minHeight: 56, minWidth: 0, padding: 4 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   disabled: { opacity: 0.45 },
