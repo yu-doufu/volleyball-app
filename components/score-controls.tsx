@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import type { TeamSide } from '@/lib/match-domain';
 
@@ -26,6 +26,7 @@ export function ScoreControls({
   disabled: boolean;
   onChange: (side: TeamSide, value: number) => void;
 }) {
+  const { width } = useWindowDimensions();
   const [homeDraft, setHomeDraft] = useState(display(homeScore));
   const [awayDraft, setAwayDraft] = useState(display(awayScore));
   const [error, setError] = useState<TeamSide | null>(null);
@@ -103,27 +104,26 @@ export function ScoreControls({
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, width < 360 && styles.narrowWrapper]}>
       {side('home', homeName, homeScore, homeDraft, setHomeDraft)}
-      <Text style={styles.dash}>−</Text>
       {side('away', awayName, awayScore, awayDraft, setAwayDraft)}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  side: { flex: 1, minWidth: 0 },
-  name: { color: '#172126', fontSize: 15, fontWeight: '800', minHeight: 38, textAlign: 'center' },
-  controls: { flexDirection: 'row', gap: 5 },
-  input: { backgroundColor: '#fff', borderColor: '#73838b', borderRadius: 8, borderWidth: 1, color: '#111', flex: 1, fontSize: 24, fontWeight: '800', minHeight: 50, minWidth: 36, paddingHorizontal: 5, textAlign: 'center' },
+  wrapper: { alignItems: 'stretch', flexDirection: 'row', gap: 12 },
+  narrowWrapper: { flexDirection: 'column' },
+  side: { backgroundColor: '#edf6fc', borderRadius: 16, flex: 1, minWidth: 0, padding: 12 },
+  name: { color: '#102a43', fontSize: 17, fontWeight: '800', minHeight: 30, textAlign: 'center' },
+  controls: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  input: { backgroundColor: 'transparent', borderColor: '#b7d2e7', borderRadius: 10, borderWidth: 1, color: '#08243d', flex: 1, fontSize: 38, fontWeight: '800', minHeight: 58, minWidth: 38, paddingHorizontal: 3, textAlign: 'center' },
   inputError: { borderColor: '#b3261e', borderWidth: 2 },
-  adjustPlus: { alignItems: 'center', backgroundColor: '#174e78', borderRadius: 8, justifyContent: 'center', minHeight: 50, minWidth: 48, paddingHorizontal: 5 },
-  adjustPlusText: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  adjustMinus: { alignItems: 'center', backgroundColor: '#e8eef1', borderColor: '#aab8c2', borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 50, minWidth: 42, paddingHorizontal: 4 },
-  adjustMinusText: { color: '#344249', fontSize: 17, fontWeight: '800' },
-  dash: { color: '#172126', fontSize: 24, fontWeight: '800', paddingTop: 30 },
-  hint: { color: '#766', fontSize: 11, minHeight: 16, textAlign: 'center' },
+  adjustPlus: { alignItems: 'center', backgroundColor: '#dcecf8', borderColor: '#b7d2e7', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 58, minWidth: 42, paddingHorizontal: 3 },
+  adjustPlusText: { color: '#0f4268', fontSize: 18, fontWeight: '800' },
+  adjustMinus: { alignItems: 'center', backgroundColor: '#f7fbfe', borderColor: '#b7d2e7', borderRadius: 10, borderWidth: 1, justifyContent: 'center', minHeight: 58, minWidth: 42, paddingHorizontal: 3 },
+  adjustMinusText: { color: '#0f4268', fontSize: 17, fontWeight: '800' },
+  hint: { color: '#526b80', fontSize: 11, minHeight: 16, marginTop: 3, textAlign: 'center' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.7 },
 });

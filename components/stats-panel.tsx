@@ -13,18 +13,10 @@ import { InputHighlight } from '@/lib/input-highlight';
 
 const CATEGORIES: readonly Category[] = ['spike', 'dig', 'reception', 'serve', 'block'];
 const INPUT_CATEGORIES: readonly Category[] = ['spike', 'dig', 'block', 'reception', 'serve'];
-const COLORS: Record<Outcome, string> = {
-  success: '#16794a',
-  ace: '#1565a8',
-  regular: '#6d4c1f',
-  miss: '#b33a3a',
-  failure: '#b33a3a',
-  jumped: '#6d4c1f',
-  touch: '#1565a8',
-  blockPoint: '#16794a',
-  receptionA: '#16794a',
-  receptionB: '#1565a8',
-  receptionMiss: '#b33a3a',
+const TONES: Record<Outcome, 'primary' | 'secondary' | 'destructive'> = {
+  success: 'primary', ace: 'primary', regular: 'secondary', miss: 'destructive', failure: 'destructive',
+  jumped: 'secondary', touch: 'secondary', blockPoint: 'primary', receptionA: 'secondary',
+  receptionB: 'secondary', receptionMiss: 'destructive',
 };
 
 const rates = (category: Category, counts: Record<string, number>) => {
@@ -150,12 +142,14 @@ export function StatsPanel({
                     onPress={() => record({ category, outcome })}
                     style={({ pressed }) => [
                       styles.button,
-                      { backgroundColor: COLORS[outcome] },
+                      TONES[outcome] === 'primary' && styles.primaryButton,
+                      TONES[outcome] === 'secondary' && styles.secondaryButton,
+                      TONES[outcome] === 'destructive' && styles.destructiveButton,
                       disabled && styles.disabled,
                       pressed && !disabled && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.buttonText}>{OUTCOME_LABELS[outcome]}</Text>
+                    <Text style={[styles.buttonText, TONES[outcome] !== 'primary' && styles.darkButtonText, TONES[outcome] === 'destructive' && styles.destructiveButtonText]}>{OUTCOME_LABELS[outcome]}</Text>
                     {highlight === `${category}:${outcome}` && !disabled && (
                       <View pointerEvents="none" style={styles.highlighted}/>
                     )}
@@ -173,16 +167,16 @@ export function StatsPanel({
 const styles = StyleSheet.create({
   list: { gap: 8 },
   card: { backgroundColor: '#fff', borderColor: '#d9e0e3', borderRadius: 12, borderWidth: 1, padding: 9 },
-  inputPanel: { backgroundColor: '#fff', borderColor: '#d9e0e3', borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
-  inputSection: { paddingHorizontal: 9, paddingVertical: 8 },
-  sectionDivider: { borderTopColor: '#d9e0e3', borderTopWidth: 1 },
-  title: { color: '#172126', fontSize: 20, fontWeight: '800' },
+  inputPanel: { backgroundColor: '#fff', borderColor: '#e4edf3', borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#17324d', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
+  inputSection: { paddingHorizontal: 14, paddingVertical: 12 },
+  sectionDivider: { borderTopColor: '#e2edf4', borderTopWidth: 1 },
+  title: { color: '#102a43', fontSize: 20, fontWeight: '800' },
   compactHeader: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, rowGap: 1 },
   compactLeft: { alignItems: 'flex-end', flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 180 },
   compactCountGroup: { alignItems: 'flex-end', flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', marginLeft: 6 },
-  compactCount: { color: '#3f4c52', fontSize: 12, fontWeight: '700', lineHeight: 15 },
+  compactCount: { color: '#526b80', fontSize: 12, fontWeight: '700', lineHeight: 15 },
   compactRateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
-  compactRate: { color: '#53636a', fontSize: 11, fontWeight: '600', lineHeight: 14 },
+  compactRate: { color: '#526b80', fontSize: 11, fontWeight: '600', lineHeight: 14 },
   summary: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 2 },
   countGroup: { flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 180 },
   countItem: { flexDirection: 'row', flexShrink: 0 },
@@ -190,9 +184,14 @@ const styles = StyleSheet.create({
   rateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
   rateItem: { flexDirection: 'row', flexShrink: 0 },
   rate: { color: '#53636a', fontSize: 14, fontWeight: '600' },
-  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 5 },
-  button: { alignItems: 'center', borderRadius: 10, flex: 1, justifyContent: 'center', minHeight: 56, minWidth: 0, padding: 4 },
+  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  button: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 58, minWidth: 0, padding: 4 },
+  primaryButton: { backgroundColor: '#08688f' },
+  secondaryButton: { backgroundColor: '#e5f1fa' },
+  destructiveButton: { backgroundColor: '#f8e8e8' },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  darkButtonText: { color: '#123651' },
+  destructiveButtonText: { color: '#9d1e1e' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
   highlighted: { position: 'absolute', top: 3, bottom: 3, left: 3, right: 3, borderColor: '#fff', borderWidth: 2, borderRadius: 7 },
