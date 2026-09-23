@@ -237,7 +237,7 @@ test('無効入力は状態を増やさず他の4項目にブロック結果を�
 test('直前ラベルは新成功と旧成功を区別する', () => {
   assert.equal(describeInput({ category: 'block', outcome: 'success' }), 'ブロック（旧記録）・成功');
   assert.equal(describeInput({ category: 'block', outcome: 'blockPoint' }), 'ブロック・成功');
-  assert.equal(describeInput({ category: 'block', outcome: 'jumped' }), 'ブロック・飛んだ');
+  assert.equal(describeInput({ category: 'block', outcome: 'jumped' }), 'ブロック・ジャンプのみ');
   assert.equal(describeInput({ category: 'block', outcome: 'touch' }), 'ブロック・ワンタッチ');
 });
 

@@ -186,7 +186,7 @@ test('v3読込失敗は空保存せず、v4が存在すれば旧v3へ戻らな�
 });
 
 test('直前ラベルは新A/B/ミスと旧成功/ミスを区別し無効カテゴリを拒否する', () => {
-  for (const [outcome, label] of [['receptionA', 'A'], ['receptionB', 'B'], ['receptionMiss', 'ミス']] as const) {
+  for (const [outcome, label] of [['receptionA', 'Aパス'], ['receptionB', 'Bパス'], ['receptionMiss', 'ミス']] as const) {
     assert.equal(describeInput({ category: 'reception', outcome }), `レセプション・${label}`);
     for (const category of ['serve', 'block', 'dig', 'spike'] as const) assert.equal(isPlayInput({ category, outcome }), false);
   }

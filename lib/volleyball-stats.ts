@@ -46,11 +46,11 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   miss: 'ミス',
   failure: '失敗',
   regular: '拾われた',
-  jumped: '飛んだ',
+  jumped: 'ジャンプのみ',
   touch: 'ワンタッチ',
   blockPoint: '成功',
-  receptionA: 'A',
-  receptionB: 'B',
+  receptionA: 'Aパス',
+  receptionB: 'Bパス',
   receptionMiss: 'ミス',
 };
 
@@ -109,8 +109,8 @@ export function isLegacyResult(input: PlayInput): boolean {
 
 export function receptionRates(counts: CategoryCounts) {
   return [
-    { label: 'A率', value: formatRate(counts.receptionA, counts.total) },
-    { label: 'B率', value: formatRate(counts.receptionB, counts.total) },
+    { label: 'Aパス率', value: formatRate(counts.receptionA, counts.total) },
+    { label: 'Bパス率', value: formatRate(counts.receptionB, counts.total) },
     { label: '成功率', value: formatRate(counts.receptionA + counts.receptionB, counts.total) },
   ];
 }

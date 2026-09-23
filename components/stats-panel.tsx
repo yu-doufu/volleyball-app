@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   CATEGORY_LABELS,
@@ -50,6 +50,12 @@ export function StatsPanel({
   onRecord?: (input: PlayInput) => boolean;
   highlightResetKey?: string;
 }) {
+  const { width } = useWindowDimensions();
+  const inlineInput = Boolean(onRecord) && width >= 390;
+  const desktopInput = Boolean(onRecord) && width >= 720;
+  const statsButtonFontSize = width >= 390 ? 18 : width >= 360 ? 16 : 14;
+  const compactCountFontSize = width >= 390 ? 12 : width >= 360 ? 11 : 10;
+  const compactRateFontSize = width >= 390 ? 11 : 10;
   const [highlight, setHighlight] = useState<string | null>(null);
   const feedback = useRef<InputHighlight | null>(null);
   useLayoutEffect(() => {
@@ -70,7 +76,7 @@ export function StatsPanel({
       {(onRecord ? INPUT_CATEGORIES : CATEGORIES).map((category, categoryIndex) => {
         const item = counts[category];
         const countItems = [
-          { label: category === 'block' ? '総ジャンプ数' : category === 'reception' ? '本数' : '合計', value: item.total },
+          { label: category === 'block' ? 'ブロックジャンプ数' : category === 'reception' ? '本数' : '合計', value: item.total },
           ...CATEGORY_OUTCOMES[category].map((outcome) => ({
             label: OUTCOME_LABELS[outcome],
             value: item[outcome],
@@ -78,30 +84,57 @@ export function StatsPanel({
         ];
         const countContent = countItems.map((count, index) => (
           <View key={count.label} style={styles.countItem}>
-            <Text style={onRecord ? styles.compactCount : styles.count}>
+            <Text numberOfLines={1} style={onRecord ? [styles.compactCount, { fontSize: compactCountFontSize }] : styles.count}>
               {count.label} {count.value}
             </Text>
             {index < countItems.length - 1 && (
-              <Text style={onRecord ? styles.compactCount : styles.count}>／</Text>
+              <Text numberOfLines={1} style={onRecord ? [styles.compactCount, { fontSize: compactCountFontSize }] : styles.count}>／</Text>
             )}
           </View>
         ));
         const rateContent = rates(category, item).map((metric) => (
           <View key={metric.label} style={styles.rateItem}>
-            <Text style={onRecord ? styles.compactRate : styles.rate}>{metric.label}</Text>
-            <Text style={onRecord ? styles.compactRate : styles.rate}> {metric.value}</Text>
+            <Text numberOfLines={1} style={onRecord ? [styles.compactRate, { fontSize: compactRateFontSize }] : styles.rate}>{metric.label}</Text>
+            <Text numberOfLines={1} style={onRecord ? [styles.compactRate, { fontSize: compactRateFontSize }] : styles.rate}> {metric.value}</Text>
           </View>
         ));
         return (
-          <View key={category} style={onRecord ? [styles.inputSection, categoryIndex > 0 && styles.sectionDivider] : styles.card}>
+          <View key={category} style={onRecord ? [styles.inputSection, inlineInput && styles.inlineSection, desktopInput && styles.desktopInputSection, categoryIndex > 0 && styles.sectionDivider] : styles.card}>
             {onRecord ? (
-              <View style={styles.compactHeader}>
-                <View style={styles.compactLeft}>
+              <>
+                <View style={[styles.inputTopRow, inlineInput && styles.inlineTopRow]}>
                   <Text style={styles.title}>{CATEGORY_LABELS[category]}</Text>
-                  <View style={styles.compactCountGroup}>{countContent}</View>
+                  <View style={[styles.compactButtonRow, inlineInput && styles.inlineButtonRow]}>
+                    {CATEGORY_OUTCOMES[category].map((outcome) => (
+                      <Pressable
+                        accessibilityLabel={`${CATEGORY_LABELS[category]} ${OUTCOME_LABELS[outcome]}`}
+                        accessibilityRole="button"
+                        disabled={disabled}
+                        key={outcome}
+                        onPress={() => record({ category, outcome })}
+                        style={({ pressed }) => [
+                          styles.button,
+                          TONES[outcome] === 'primary' && styles.primaryButton,
+                          TONES[outcome] === 'secondary' && styles.secondaryButton,
+                          TONES[outcome] === 'destructive' && styles.destructiveButton,
+                          disabled && styles.disabled,
+                          pressed && !disabled && styles.pressed,
+                        ]}
+                      >
+                        <Text numberOfLines={1} style={[styles.buttonText, { fontSize: statsButtonFontSize }, TONES[outcome] !== 'primary' && styles.darkButtonText, TONES[outcome] === 'destructive' && styles.destructiveButtonText]}>{OUTCOME_LABELS[outcome]}</Text>
+                        {highlight === `${category}:${outcome}` && !disabled && (
+                          <View pointerEvents="none" style={styles.highlighted}/>
+                        )}
+                      </Pressable>
+                    ))}
+                    {CATEGORY_OUTCOMES[category].length === 2 && <View pointerEvents="none" style={styles.buttonPlaceholder}/>}
+                  </View>
                 </View>
-                <View style={styles.compactRateGroup}>{rateContent}</View>
-              </View>
+                <View style={styles.inputCountRow}>
+                  <View style={styles.compactCountGroup}>{countContent}</View>
+                  <View style={styles.compactRateGroup}>{rateContent}</View>
+                </View>
+              </>
             ) : (
               <>
                 <Text style={styles.title}>{CATEGORY_LABELS[category]}</Text>
@@ -131,32 +164,6 @@ export function StatsPanel({
                 )}
               </>
             )}
-            {onRecord && (
-              <View style={styles.compactButtonRow}>
-                {CATEGORY_OUTCOMES[category].map((outcome) => (
-                  <Pressable
-                    accessibilityLabel={`${CATEGORY_LABELS[category]} ${OUTCOME_LABELS[outcome]}`}
-                    accessibilityRole="button"
-                    disabled={disabled}
-                    key={outcome}
-                    onPress={() => record({ category, outcome })}
-                    style={({ pressed }) => [
-                      styles.button,
-                      TONES[outcome] === 'primary' && styles.primaryButton,
-                      TONES[outcome] === 'secondary' && styles.secondaryButton,
-                      TONES[outcome] === 'destructive' && styles.destructiveButton,
-                      disabled && styles.disabled,
-                      pressed && !disabled && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.buttonText, TONES[outcome] !== 'primary' && styles.darkButtonText, TONES[outcome] === 'destructive' && styles.destructiveButtonText]}>{OUTCOME_LABELS[outcome]}</Text>
-                    {highlight === `${category}:${outcome}` && !disabled && (
-                      <View pointerEvents="none" style={styles.highlighted}/>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            )}
           </View>
         );
       })}
@@ -168,15 +175,18 @@ const styles = StyleSheet.create({
   list: { gap: 8 },
   card: { backgroundColor: '#fff', borderColor: '#d9e0e3', borderRadius: 12, borderWidth: 1, padding: 9 },
   inputPanel: { backgroundColor: '#fff', borderColor: '#e4edf3', borderRadius: 18, borderWidth: 1, overflow: 'hidden', shadowColor: '#17324d', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2 },
-  inputSection: { paddingHorizontal: 14, paddingVertical: 12 },
+  inputSection: { paddingHorizontal: 14, paddingVertical: 10 },
+  inlineSection: { paddingHorizontal: 10 },
+  desktopInputSection: { paddingHorizontal: 5, paddingVertical: 5 },
   sectionDivider: { borderTopColor: '#e2edf4', borderTopWidth: 1 },
-  title: { color: '#102a43', fontSize: 20, fontWeight: '800' },
-  compactHeader: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', columnGap: 6, rowGap: 1 },
-  compactLeft: { alignItems: 'flex-end', flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 180 },
-  compactCountGroup: { alignItems: 'flex-end', flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', marginLeft: 6 },
-  compactCount: { color: '#526b80', fontSize: 12, fontWeight: '700', lineHeight: 15 },
-  compactRateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
-  compactRate: { color: '#526b80', fontSize: 11, fontWeight: '600', lineHeight: 14 },
+  title: { color: '#102a43', fontSize: 18, fontWeight: '800' },
+  inputTopRow: { alignItems: 'stretch', gap: 6 },
+  inlineTopRow: { alignItems: 'center', flexDirection: 'row' },
+  inputCountRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  compactCountGroup: { alignItems: 'flex-end', flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', marginTop: 0 },
+  compactCount: { color: '#526b80', fontSize: 12, fontWeight: '700', lineHeight: 14 },
+  compactRateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 4, marginTop: 0, maxWidth: '100%' },
+  compactRate: { color: '#526b80', fontSize: 11, fontWeight: '600', lineHeight: 13 },
   summary: { alignItems: 'flex-start', flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 2 },
   countGroup: { flexDirection: 'row', flexGrow: 1, flexShrink: 1, flexWrap: 'wrap', minWidth: 180 },
   countItem: { flexDirection: 'row', flexShrink: 0 },
@@ -184,11 +194,13 @@ const styles = StyleSheet.create({
   rateGroup: { flexDirection: 'row', flexShrink: 1, flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
   rateItem: { flexDirection: 'row', flexShrink: 0 },
   rate: { color: '#53636a', fontSize: 14, fontWeight: '600' },
-  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  button: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 58, minWidth: 0, padding: 4 },
+  compactButtonRow: { flexDirection: 'row', gap: 8, marginTop: 0, width: '100%' },
+  inlineButtonRow: { flex: 1, minWidth: 0 },
+  button: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 50, minWidth: 0, padding: 4 },
+  buttonPlaceholder: { flex: 1, minHeight: 50 },
   primaryButton: { backgroundColor: '#08688f' },
-  secondaryButton: { backgroundColor: '#e5f1fa' },
-  destructiveButton: { backgroundColor: '#f8e8e8' },
+  secondaryButton: { backgroundColor: '#e5f1fa', borderColor: '#b7d2e7', borderWidth: 1 },
+  destructiveButton: { backgroundColor: '#f8e8e8', borderColor: '#e7b8b8', borderWidth: 1 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   darkButtonText: { color: '#123651' },
   destructiveButtonText: { color: '#9d1e1e' },

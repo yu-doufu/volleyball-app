@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, Platform } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { createEmptyDatabase } from '@/lib/match-domain';
@@ -25,6 +26,7 @@ export function useMatchDatabase() {
   const requestRef = useRef(0);
 
   const load = useCallback(async () => {
+    requestRef.current += 1;
     databaseRef.current = null;
     setDatabase(null);
     setStatus({ phase: 'loading' });
@@ -44,6 +46,25 @@ export function useMatchDatabase() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const refresh = () => {
+        if (document.visibilityState === 'visible') void load();
+      };
+      document.addEventListener('visibilitychange', refresh);
+      window.addEventListener('focus', refresh);
+      return () => {
+        document.removeEventListener('visibilitychange', refresh);
+        window.removeEventListener('focus', refresh);
+      };
+    }
+
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void load();
+    });
+    return () => subscription.remove();
   }, [load]);
 
   const persist = useCallback(async (snapshot: MatchDatabase) => {

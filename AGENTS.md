@@ -1,88 +1,77 @@
 # Repository guidelines
 
-## Project overview
+## プロジェクト概要
 
-- This repository is an Expo SDK 54 / React Native 0.81 application for recording volleyball matches. It uses TypeScript in strict mode, React 19, Expo Router 6, and the React Compiler.
-- The application runs on Android, iOS, and the web. Web output is configured as a static export in `app.json`; EAS has an internal Android APK preview profile in `eas.json`.
-- Match data is local-only and is persisted with `@react-native-async-storage/async-storage`. There is no cloud sync, login, or backup. AsyncStorage is not encrypted and must never contain credentials or other secrets.
-- `PROJECT.md` is the authoritative local description of current behavior, formulas, persistence compatibility, known limitations, and manual verification notes. `README.md` contains the basic Expo startup instructions.
+Expo / React Native によるバレーボール記録アプリです。
+Android、iOS、Web を対象とします。
 
-## Important locations
+現在の依存関係とビルド設定は `package.json`、`package-lock.json`、`app.json`、`eas.json`、
+現行動作・計算式・保存互換性・既知の制約は `PROJECT.md` を正本とします。
 
-- `app/`: Expo Router routes. `app/index.tsx` currently owns the main screen flow; `app/_layout.tsx` defines the root layout.
-- `components/`: reusable React Native UI. Match input and results are primarily in `stats-panel.tsx`, `score-controls.tsx`, and `result-list.tsx`.
-- `hooks/`: UI integration for persistence and platform behavior.
-- `lib/`: framework-independent match domain, statistics, highlighting, and persistence logic.
-- `tests/`: Node test-runner tests for domain and storage behavior.
-- `assets/`, `constants/`: images and shared theme values.
-- `app.json`, `eas.json`, `tsconfig.json`, and `eslint.config.js`: Expo, build, TypeScript, and lint configuration.
+## 主な構成
 
-## Before making changes
+- `app/`: 画面と画面フロー
+- `components/`: 再利用UI
+- `hooks/`: 保存とUI統合
+- `lib/`: 試合ドメイン、統計、ハイライト、永続化
+- `tests/`: ドメインと保存のテスト
 
-1. Read the Issue purpose, requested implementation, constraints, and every Acceptance Criterion. Treat information supplied in the task as authoritative; do not access GitHub when the task prohibits it.
-2. Inspect `git status` and the relevant source, tests, `PROJECT.md`, and configuration before editing. Preserve all user changes and unrelated uncommitted work.
-3. Keep the change narrowly within the Issue. Do not add speculative requirements, broad refactors, dependency upgrades, or unrelated formatting changes.
-4. Before writing Expo-specific code, consult the exact versioned Expo SDK 54 documentation at <https://docs.expo.dev/versions/v54.0.0/> when network access is permitted. If the task forbids network access, rely on the installed SDK, local type definitions, and existing project patterns, and record that limitation rather than guessing.
+## 作業方針
 
-## Implementation rules
+タスクで渡されたIssueの目的、制約、Acceptance Criteriaを今回の作業の正本とします。
 
-- Follow the existing TypeScript and React Native style: strict types, functional components, immutable/read-only domain data where established, single quotes, semicolons, and the `@/*` path alias for application imports. Preserve explicit `.ts` extensions in the framework-independent `lib/` and Node test imports where that pattern is used.
-- Keep domain and aggregation logic in `lib/`; keep rendering and interactions in `app/` or `components/`; keep persistence/UI coordination in `hooks/`. Reuse existing components and functions before introducing duplicates.
-- Preserve Android, iOS, and web behavior. Do not introduce browser-only or native-only APIs without an explicit platform guard and relevant verification.
-- Match storage currently uses schema version 4 and migrates versions 1, 2, and 3. Do not rename storage keys, rewrite legacy events, delete old data, persist derived totals/rates, or weaken validation and serialized writes without an explicit migration requirement and tests. Never test against a user's real saved data.
-- Statistics do not automatically change the score. Counts are stored as events, totals and rates are derived, and Undo respects operation order and set boundaries. Preserve these invariants unless the Issue explicitly changes them.
-- Do not edit generated or local-only paths such as `node_modules/`, `.expo/`, `dist/`, `web-build/`, `expo-env.d.ts`, `ios/`, or `android/`. Do not add `.env*`, keys, certificates, tokens, passwords, personal data, or other secrets to Git.
-- Prefer the versions already locked in `package-lock.json`. Do not install or upgrade dependencies unless required by the Issue. When dependency restoration is necessary and permitted, use `npm ci` rather than regenerating the lockfile unnecessarily.
-- Do not remove, revert, overwrite, or reformat user work merely because it is unrelated or uncommitted.
+Issue達成に必要な範囲を優先して確認・変更してください。
+既存の設計と実装を利用し、Issue対象外の変更はできるだけ避けてください。
 
-## Available commands and verification
+未コミット変更がある場合は保持し、今回の作業に必要な部分だけ変更してください。
 
-Run the smallest relevant checks during development, then all safe applicable checks before completion. On PowerShell, `npm.cmd` and `npx.cmd` can avoid script-resolution issues.
+調査済みのコード、diff、履歴、ログなどを理由なく繰り返し確認せず、
+Issueを達成できたら追加調査を終了してください。
+
+## 実装上のルール
+
+既存のTypeScript / React Nativeの構成と責務分離を維持してください。
+
+保存形式、保存キー、legacy event、統計計算、Undo、セット境界など
+既存データや試合記録との互換性に関わる仕様は、Issueで変更が要求されていない限り維持してください。
+
+生成物、秘密情報、個人情報はコミットしないでください。
+
+UIを変更する場合は、既存画面との一貫性、操作の分かりやすさ、
+誤操作の防止、主要なアクセシビリティを考慮してください。
+必要な場合は対象プラットフォームの公式デザインガイドを参照してください。
+
+## 検証
+
+検証は変更内容とIssueの要求に応じて、必要なものを選んで実行してください。
+
+利用可能な主な検証:
 
 ```powershell
-# Automated tests (defined in package.json)
 npm.cmd test
-
-# TypeScript strict typecheck (no package.json script)
 npx.cmd tsc --noEmit
-
-# ESLint (defined in package.json)
 npm.cmd run lint
-
-# Static web production export / build (no package.json build script)
 npx.cmd expo export --platform web --output-dir dist
+git diff --check
 ```
 
-- If the standard test command fails specifically because the execution environment cannot spawn test workers (`spawn EPERM`), run the same suite without test isolation and report both results:
+小規模または局所的な変更では、直接関係する低コストな検証を優先してください。
+全テスト、全体lint、Web exportなどの比較的重い検証は、
+Issueで要求されている場合、変更範囲が広い場合、または必要性がある場合に実行してください。
 
-  ```powershell
-  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --experimental-test-isolation=none --test tests/*.test.ts
-  ```
+検証失敗が今回の変更による場合は、Issueの範囲内で修正して必要な再検証を行ってください。
+既存の無関係な問題は作業を拡大せず結果に記録してください。
 
-- The web export can also fail with `spawn EPERM` in restricted environments. Record this as an environment limitation; do not claim a successful build from a previous run. Do not overwrite a `dist/` directory containing user-authored files—use a separate output directory in that case.
-- For app behavior or layout changes, supplement automation with the relevant manual checks described in `PROJECT.md`. Clearly distinguish automated tests, local browser checks, Expo Go checks, standalone APK checks, and checks not performed.
-- Use `git diff --check`, inspect `git diff`, and review `git status` before completion. Confirm that all Acceptance Criteria are met and no generated output or unrelated change is included.
+## Git・外部操作
 
-When a check fails, determine whether the failure was caused by the current change. If it was and can be fixed safely, follow this loop until clean: implement -> verify -> identify cause -> fix -> re-verify. Do not repair unrelated pre-existing problems; document them instead. Never hide, delete, or weaken a failing test merely to make verification pass.
+未コミット変更を保持し、破壊的なGit操作や履歴改変は行わないでください。
 
-## Git and external-service safety
+commit、push、公開、PR、Issue操作、依存関係の変更などは、
+IssueまたはPADから明示された要求に従ってください。
 
-- Do not close or comment on GitHub Issues, create or merge Pull Requests, or commit, push, force-push, tag, or publish unless the user explicitly requests that specific action.
-- Do not deploy the web app, submit builds, create APKs through external services, or change EAS/GitHub configuration without explicit authorization.
-- Do not use GitHub, other external services, or network access when the task prohibits it.
-- Never place authentication data, API keys, passwords, secrets, signing material, or private user data in source files, logs, result files, commits, or generated artifacts.
-- Do not perform destructive Git operations or discard existing changes without explicit user approval.
+## PAD/Codex
 
-## Completion and PAD/Codex handoff
+PAD/Codexタスクでは、作業と必要な検証が終了した最後に
+リポジトリ直下へ `.codex-result.txt` をUTF-8で作成してください。
 
-After implementation and all verification are finished, create or update `./.codex-result.txt` in the repository root as the final action when the task uses the PAD/Codex workflow. Write it as UTF-8 and include:
-
-- Issue number;
-- concise implementation summary;
-- every changed file and a specific explanation of each change;
-- every verification command and its actual result, including skipped checks and environment limitations;
-- an item-by-item achieved/not-achieved assessment of the Acceptance Criteria;
-- any self-correction performed; and
-- remaining issues or human/manual checks, or `なし` when there are none.
-
-The result file is a local automation handoff, not an instruction to close the Issue, commit, push, open a PR, or merge. Do not create it early, and do not add it to a commit unless the user explicitly asks.
+内容と形式はタスクの指定に従い、簡潔に結果を記録してください。

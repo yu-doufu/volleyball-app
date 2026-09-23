@@ -18,6 +18,7 @@ export function ScoreControls({
   awayScore,
   disabled,
   onChange,
+  hideNames = false,
 }: {
   homeName: string;
   awayName: string;
@@ -25,6 +26,7 @@ export function ScoreControls({
   awayScore: number | null;
   disabled: boolean;
   onChange: (side: TeamSide, value: number) => void;
+  hideNames?: boolean;
 }) {
   const { width } = useWindowDimensions();
   const [homeDraft, setHomeDraft] = useState(display(homeScore));
@@ -73,6 +75,8 @@ export function ScoreControls({
           onBlur={() => commit(teamSide, draft)}
           onChangeText={(value) => { setDraft(value); setError(null); }}
           selectTextOnFocus
+          placeholder="未確定"
+          placeholderTextColor="#91a4b2"
           style={[styles.input, error === teamSide && styles.inputError]}
           value={draft}
       />
@@ -92,19 +96,19 @@ export function ScoreControls({
     );
     return (
       <View style={styles.side}>
-        <Text numberOfLines={2} style={styles.name}>{name}</Text>
+        {!hideNames && <Text numberOfLines={2} style={styles.name}>{name}</Text>}
         <View style={styles.controls}>
-          {teamSide === 'home'
-            ? <>{decrement}{input}{increment}</>
-            : <>{increment}{input}{decrement}</>}
+        {teamSide === 'home'
+          ? <>{decrement}{input}{increment}</>
+          : <>{increment}{input}{decrement}</>}
         </View>
-        <Text style={styles.hint}>{error === teamSide ? '0以上の整数を入力' : '空欄は未確定'}</Text>
+        {!hideNames && <Text style={styles.hint}>{error === teamSide ? '0以上の整数を入力' : '空欄は未確定'}</Text>}
       </View>
     );
   };
 
   return (
-    <View style={[styles.wrapper, width < 360 && styles.narrowWrapper]}>
+    <View style={[styles.wrapper, width < 390 && styles.narrowWrapper]}>
       {side('home', homeName, homeScore, homeDraft, setHomeDraft)}
       {side('away', awayName, awayScore, awayDraft, setAwayDraft)}
     </View>

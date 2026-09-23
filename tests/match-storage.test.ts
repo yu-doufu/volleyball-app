@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   clearActiveMatch,
   clearCurrentSet,
+  completeMatch,
   completeCurrentSet,
   createEmptyDatabase,
   deriveSet,
@@ -110,6 +111,27 @@ test('version 4保存失敗で渡した記録を変更せず再試行できる',
   assert.equal(storage.values.has(MATCH_DATABASE_KEY), false);
   await repository.save(database);
   assert.deepEqual((await repository.load()).database, database);
+});
+
+test('completed match remains available after a fresh repository load', async () => {
+  const storage = new Storage();
+  const repository = new MatchRepository(storage);
+  let database = startMatch(
+    createEmptyDatabase(),
+    { date: '2026-09-23', homeTeam: 'home', awayTeam: 'away' },
+    { id: 'completed-reload', now: '2026-09-23T00:00:00.000Z' },
+  );
+  database = recordStat(database, { category: 'serve', outcome: 'ace' });
+  database = completeCurrentSet(database, { home: 25, away: 23 });
+  database = completeMatch(database, '2026-09-23T00:01:00.000Z');
+  await repository.save(database);
+
+  const reloaded = (await new MatchRepository(storage).load()).database!;
+  assert.equal(reloaded.activeMatchId, null);
+  assert.equal(reloaded.matches.length, 1);
+  assert.equal(reloaded.matches[0].status, 'completed');
+  assert.equal(reloaded.matches[0].sets[0].finalHomeScore, 25);
+  assert.equal(reloaded.matches[0].sets[0].operations.length, 1);
 });
 
 test('empty next-set return persists only the earlier completed set', async () => {
